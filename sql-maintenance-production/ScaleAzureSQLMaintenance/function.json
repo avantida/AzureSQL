@@ -1,0 +1,18 @@
+{
+  "bindings": [
+    {
+      "name": "myTimer",
+      "type": "timerTrigger",
+      "direction": "in",
+      "schedule": "0 40 1 * * *"
+    },
+    {
+      "type": "queue",
+      "name": "outputQueueItem",
+      "queueName": "azuresqlmaintenance",
+      "connection": "AzureWebJobsStorage",
+      "direction": "out"
+    }
+  ],
+  "disabled": false
+}

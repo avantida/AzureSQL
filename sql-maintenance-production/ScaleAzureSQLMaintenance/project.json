@@ -1,0 +1,12 @@
+{
+ "frameworks": 
+ {  
+  "net46":
+  { 
+   "dependencies":
+   {
+    "Microsoft.Azure.Management.Fluent" : "1.1.3" 
+   }
+  }
+ }
+}
