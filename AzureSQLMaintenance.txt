@@ -1,4 +1,10 @@
 /* Azure SQL Maintenance - Maintenance script for Azure SQL Database */
+/* MODIFIED BY AVANTIDA - v2.1
+	- for use with Azure Functions logging 
+	- to create [AzureSQLMaintenance] user account 
+*/
+
+/* Source: https://blogs.msdn.microsoft.com/azuresqldbsupport/2016/07/03/how-to-maintain-azure-sql-indexes-and-statistics/ */
 /* This script provided AS IS, Please review the code before executing this on production environment */
 /* For any issue or suggestion please email to: yocr@microsoft.com */
 
@@ -26,6 +32,7 @@ as
 begin
 	set nocount on
 	declare @msg nvarchar(max);
+	declare @var nvarchar(max);
 	declare @minPageCountForIndex int = 40;
 	declare @OperationTime datetime2 = sysdatetime();
 	declare @KeepXOperationInLog int =3;
@@ -59,7 +66,7 @@ begin
 	end
 	else 
 	begin
-		/*Write operation parameters*/
+		/*Write operation parameters
 		raiserror('-----------------------',0,0)
 		set @msg = 'set operation = ' + @operation;
 		raiserror(@msg,0,0)
@@ -68,6 +75,9 @@ begin
 		set @msg = 'set LogToTable = ' + cast(@LogToTable as varchar(1));
 		raiserror(@msg,0,0)
 		raiserror('-----------------------',0,0)
+		*/
+		set @msg = 'v2.1 ' + @operation + ' ' + @mode;
+		raiserror(@msg,0,0)
 	end
 	
 	/* Prepare Log Table */
@@ -83,7 +93,7 @@ begin
 
 	if @operation in('index','all')
 	begin
-		raiserror('Get index information...(wait)',0,0) with nowait;
+		--raiserror('Get index information...(wait)',0,0) with nowait;
 		/* Get Index Information */
 		select 
 			i.[object_id]
@@ -110,27 +120,28 @@ begin
 		-- mark indexes XML,spatial and columnstore not to run online update 
 		update #idxBefore set OnlineOpIsNotSupported=1 where [object_id] in (select [object_id] from #idxBefore where index_id >=1000)
 		
-		
+		/*
 		raiserror('---------------------------------------',0,0) with nowait
 		raiserror('Index Information:',0,0) with nowait
 		raiserror('---------------------------------------',0,0) with nowait
+		*/
 
-		select @msg = count(*) from #idxBefore 
-		set @msg = 'Total Indexes: ' + @msg
-		raiserror(@msg,0,0) with nowait
+		select @var = count(*) from #idxBefore
+		set @msg = '	Total Indexes: ' + @var
+		--raiserror(@msg,0,0) with nowait
 
-		select @msg = avg(avg_fragmentation_in_percent) from #idxBefore where page_count>@minPageCountForIndex
-		set @msg = 'Average Fragmentation: ' + @msg
-		raiserror(@msg,0,0) with nowait
+		select @var = avg(avg_fragmentation_in_percent) from #idxBefore where page_count>@minPageCountForIndex
+		set @msg = @msg + '	Average Fragmentation: ' + @var
+		--raiserror(@msg,0,0) with nowait
 
-		select @msg = sum(iif(avg_fragmentation_in_percent>=5 and page_count>@minPageCountForIndex,1,0)) from #idxBefore 
-		set @msg = 'Fragmented Indexes: ' + @msg
+		select @var = sum(iif(avg_fragmentation_in_percent>=5 and page_count>@minPageCountForIndex,1,0)) from #idxBefore
+		set @msg = @msg + '	Fragmented Indexes: ' + @var
 		raiserror(@msg,0,0) with nowait
 
 				
-		raiserror('---------------------------------------',0,0) with nowait
+		--raiserror('---------------------------------------',0,0) with nowait
 
-			
+		
 			
 			
 		/* create queue for update indexes */
@@ -164,7 +175,7 @@ begin
 	if @operation in('statistics','all')
 	begin 
 		/*Gets Stats for database*/
-		raiserror('Get statistics information...',0,0) with nowait;
+		--raiserror('Get statistics information...',0,0) with nowait;
 		select 
 			ObjectSchema = OBJECT_SCHEMA_NAME(s.object_id)
 			,ObjectName = object_name(s.object_id) 
@@ -178,20 +189,21 @@ begin
 		where OBJECT_SCHEMA_NAME(s.object_id) != 'sys' and (sp.modification_counter>0 or @mode='dummy')
 		order by sp.last_updated asc
 
-		
+		/*
 		raiserror('---------------------------------------',0,0) with nowait
 		raiserror('Statistics Information:',0,0) with nowait
 		raiserror('---------------------------------------',0,0) with nowait
+		*/
 
-		select @msg = sum(modification_counter) from #statsBefore
-		set @msg = 'Total Modifications: ' + @msg
-		raiserror(@msg,0,0) with nowait
+		select @var = sum(modification_counter) from #statsBefore
+		set @msg = '	Total Modifications: ' + @var
+		--raiserror(@msg,0,0) with nowait
 		
-		select @msg = sum(iif(modification_counter>0,1,0)) from #statsBefore
-		set @msg = 'Modified Statistics: ' + @msg
+		select @var = sum(iif(modification_counter>0,1,0)) from #statsBefore
+		set @msg = @msg + '	Modified Statistics: ' + @var
 		raiserror(@msg,0,0) with nowait
 				
-		raiserror('---------------------------------------',0,0) with nowait
+		--raiserror('---------------------------------------',0,0) with nowait
 
 
 
@@ -270,3 +282,10 @@ exec  AzureSQLMaintenance 'statistics'
 exec  AzureSQLMaintenance 'index'
 
 */
+
+IF NOT EXISTS(select * from sys.database_principals where name = 'AzureSQLMaintenance')
+	CREATE USER [AzureSQLMaintenance] WITH PASSWORD = '<removed>';
+GRANT EXECUTE ON [AzureSQLMaintenance] TO [AzureSQLMaintenance]
+ALTER ROLE db_ddladmin ADD MEMBER [AzureSQLMaintenance]
+GO
+print 'AzureSQLMaintenance user installed' 
